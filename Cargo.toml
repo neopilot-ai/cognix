@@ -16,6 +16,7 @@ publish = false
 asset_macro = { path = "crates/asset_macro" }
 cognix_core = { path = "crates/cognix_core" }
 cognix_features = { path = "crates/cognix_features" }
+cognix_terminal = { path = "crates/cognix_terminal" }
 cognix_util = { path = "crates/cognix_util" }
 cognixui = { path = "crates/cognixui_core", package = "cognixui_core" }
 cognixui_extras = { path = "crates/cognixui_extras" }
