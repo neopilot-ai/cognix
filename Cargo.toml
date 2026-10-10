@@ -34,6 +34,35 @@ websocket = { path = "crates/websocket" }
 # here to copying-and-pasting versions.
 anyhow = "1.0"
 arboard = { version = "3.6.1", default-features = false }
+arborium = { version = "2", default-features = false, features = [
+  "lang-bash",
+  "lang-rust",
+  "lang-go",
+  "lang-yaml",
+  "lang-python",
+  "lang-javascript",
+  "lang-typescript",
+  "lang-tsx",
+  "lang-java",
+  "lang-cpp",
+  "lang-c-sharp",
+  "lang-html",
+  "lang-css",
+  "lang-c",
+  "lang-json",
+  "lang-hcl",
+  "lang-lua",
+  "lang-ruby",
+  "lang-php",
+  "lang-swift",
+  "lang-elixir",
+  "lang-sql",
+  "lang-starlark",
+  "lang-objc",
+  "lang-xml",
+  "lang-vue",
+  "lang-dockerfile",
+] }
 arrayvec = "0.7.4"
 async-broadcast = "0.7.2"
 async-channel = "2.3.1"
@@ -158,6 +187,7 @@ shellexpand = "3.1.1"
 similar = { version = "2.7", features = ["inline"] }
 simplelog = "0.12.2"
 smallvec = "1.6.1"
+streaming-iterator = "0.1.9"
 strum = "0.27"
 strum_macros = "0.27"
 sysinfo = { version = "0.37.0", default-features = false, features = [

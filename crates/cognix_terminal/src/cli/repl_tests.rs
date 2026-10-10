@@ -290,3 +290,88 @@ fn session_directive_prints_the_session_id() {
     runtime().block_on(repl.handle_line(":session"));
     assert!(text(&buf).contains("test"));
 }
+#[test]
+fn complete_suggests_a_registered_command() {
+    let (mut repl, buf) = seeded_repl();
+    repl.session().terminal.begin_block("git status");
+    // "kubec" uniquely identifies kubectl in the builtin registry, so this does not
+    // depend on what happens to be installed on the machine running the test.
+    runtime().block_on(repl.handle_line(":complete kubec"));
+    let out = text(&buf);
+    assert!(out.contains("kubectl"), "got {out}");
+    assert!(out.contains("Kubernetes"), "expected the signature detail: {out}");
+}
+
+#[test]
+fn complete_suggests_flags_for_a_known_command() {
+    let (mut repl, buf) = seeded_repl();
+    runtime().block_on(repl.handle_line(":complete git --st"));
+    let out = text(&buf);
+    assert!(out.contains("--status"), "got {out}");
+}
+
+#[test]
+fn complete_reports_when_there_is_nothing_to_offer() {
+    let (mut repl, buf) = seeded_repl();
+    runtime().block_on(repl.handle_line(":complete zzzz"));
+    assert!(text(&buf).contains("no completions"));
+}
+
+#[test]
+fn highlight_renders_ansi_for_a_detected_language() {
+    let session = Session::new("t");
+    let i = session.terminal.begin_block("main.rs");
+    session
+        .terminal
+        .with_block(i, |b| {
+            b.set_output(BlockOutput::from_bytes(
+                b"fn main() {\n    // note\n}\n",
+                b"",
+            ));
+            b.finish(ExitCode::from(0), 1);
+        })
+        .unwrap();
+
+    let (writer, buf) = sink();
+    let mut repl = Repl::new(session).with_output(Box::new(writer));
+    runtime().block_on(repl.handle_line(":highlight 0"));
+    let out = text(&buf);
+    assert!(out.contains("\x1b["), "expected ANSI escapes, got {out:?}");
+    assert!(out.contains("note"), "source text must survive: {out:?}");
+}
+
+#[test]
+fn highlight_annotated_emits_kind_tags() {
+    let session = Session::new("t");
+    let i = session.terminal.begin_block("main.rs");
+    session
+        .terminal
+        .with_block(i, |b| {
+            b.set_output(BlockOutput::from_bytes(b"// a note\n", b""));
+            b.finish(ExitCode::from(0), 1);
+        })
+        .unwrap();
+
+    let (writer, buf) = sink();
+    let mut repl = Repl::new(session).with_output(Box::new(writer));
+    runtime().block_on(repl.handle_line(":highlight 0 rust --annotated"));
+    assert!(text(&buf).contains("[comment]"));
+}
+
+#[test]
+fn highlight_reports_undetectable_languages() {
+    let session = Session::new("t");
+    session.terminal.begin_block("weird.zzzz");
+    let (writer, buf) = sink();
+    let mut repl = Repl::new(session).with_output(Box::new(writer));
+    runtime().block_on(repl.handle_line(":highlight 0"));
+    assert!(text(&buf).contains("cannot detect a language"));
+}
+
+#[test]
+fn highlight_without_a_cursor_errors() {
+    let (writer, buf) = sink();
+    let mut repl = Repl::new(Session::new("t")).with_output(Box::new(writer));
+    runtime().block_on(repl.handle_line(":highlight"));
+    assert!(text(&buf).contains("no current block"));
+}

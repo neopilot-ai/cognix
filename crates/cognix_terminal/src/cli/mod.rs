@@ -112,6 +112,20 @@ pub enum Directive {
     Nav(NavDirective),
     /// Print the session id.
     Session,
+    /// Complete the token at the end of a command line.
+    Complete {
+        /// The line to complete.
+        line: String,
+    },
+    /// Highlight a block's output as source code.
+    Highlight {
+        /// The block to highlight.
+        target: Option<BlockRef>,
+        /// Language name, e.g. `rust`. Detected from the command if omitted.
+        language: Option<String>,
+        /// Emit `[kind]` annotations instead of ANSI colour.
+        annotated: bool,
+    },
     /// Echo an unknown directive's text, for error reporting.
     Unknown(String),
 }
@@ -252,6 +266,30 @@ pub fn parse_directive(line: &str) -> Result<Option<Directive>, String> {
         "copy" => Directive::Copy {
             target: positional.first().and_then(|w| parse_ref(Some(w.as_str()))),
         },
+        "complete" | "comp" => {
+            let line = if positional.is_empty() {
+                rest.to_owned()
+            } else {
+                rest.split_whitespace().collect::<Vec<_>>().join(" ")
+            };
+            Directive::Complete { line }
+        }
+        "highlight" | "hl" => {
+            // A numeric positional is a block index; anything else names a language.
+            let target = positional
+                .iter()
+                .find(|w| w.parse::<usize>().is_ok())
+                .and_then(|w| parse_ref(Some(w.as_str())));
+            let language = positional
+                .iter()
+                .find(|w| w.parse::<usize>().is_err())
+                .cloned();
+            Directive::Highlight {
+                target,
+                language,
+                annotated: has("--annotated"),
+            }
+        }
         "nav" | "goto" | "j" | "k" => {
             let nav = match first.as_str() {
                 "next" | "n" | "j" => NavDirective::Next,

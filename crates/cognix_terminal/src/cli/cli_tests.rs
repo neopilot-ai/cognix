@@ -200,3 +200,58 @@ fn unknown_directives_are_reported() {
 fn session_directive_parses() {
     assert_eq!(parse_directive(":session").unwrap(), Some(Directive::Session));
 }
+#[test]
+fn complete_parses_the_line_to_complete() {
+    assert_eq!(
+        parse_directive(":complete git st").unwrap(),
+        Some(Directive::Complete {
+            line: "git st".to_owned()
+        })
+    );
+}
+
+#[test]
+fn complete_with_no_arguments_completes_an_empty_line() {
+    assert_eq!(
+        parse_directive(":complete").unwrap(),
+        Some(Directive::Complete {
+            line: String::new()
+        })
+    );
+}
+
+#[test]
+fn highlight_defaults_to_the_cursor_and_autodetect() {
+    assert_eq!(
+        parse_directive(":highlight").unwrap(),
+        Some(Directive::Highlight {
+            target: None,
+            language: None,
+            annotated: false
+        })
+    );
+}
+
+#[test]
+fn highlight_parses_a_block_ref_and_language() {
+    assert_eq!(
+        parse_directive(":highlight 2 rust").unwrap(),
+        Some(Directive::Highlight {
+            target: Some(BlockRef::from(BlockIndex(2))),
+            language: Some("rust".to_owned()),
+            annotated: false
+        })
+    );
+}
+
+#[test]
+fn highlight_supports_annotated_output() {
+    assert_eq!(
+        parse_directive(":highlight 0 python --annotated").unwrap(),
+        Some(Directive::Highlight {
+            target: Some(BlockRef::from(BlockIndex(0))),
+            language: Some("python".to_owned()),
+            annotated: true
+        })
+    );
+}

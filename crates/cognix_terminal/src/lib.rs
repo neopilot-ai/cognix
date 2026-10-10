@@ -26,12 +26,16 @@
 
 pub mod block;
 pub mod cli;
+pub mod completer;
+pub mod highlight;
 pub mod runner;
 pub mod search;
 pub mod session;
 pub mod share;
 
 pub use block::{Block, BlockId, BlockIndex, BlockOutput, BlockState, OutputLine, Stream};
+pub use completer::{complete, Completion, CompletionKind, Completions, SignatureRegistry};
+pub use highlight::{highlight, highlight_path, HighlightSpan, TokenKind};
 pub use runner::RunError;
 pub use search::{search, search_detailed, SearchError, SearchQuery};
 pub use session::{BlockRef, Navigator, Session, SessionError, TerminalSession};

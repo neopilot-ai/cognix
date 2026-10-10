@@ -7,6 +7,7 @@ use crate::session::BlockRef;
 use crate::cli::{
     parse_directive, BookmarkTarget, Directive, NavDirective, SearchDirective,
 };
+use crate::completer::SignatureRegistry;
 use crate::search::{search, search_detailed, SearchQuery};
 use crate::session::Session;
 use crate::share::{share_block, share_blocks, ShareFormat};
@@ -14,6 +15,7 @@ use crate::share::{share_block, share_blocks, ShareFormat};
 /// Drives a session from an interactive prompt.
 pub struct Repl {
     session: Session,
+    registry: SignatureRegistry,
     out: Box<dyn Write>,
 }
 
@@ -21,8 +23,15 @@ impl Repl {
     pub fn new(session: Session) -> Self {
         Self {
             session,
+            registry: SignatureRegistry::builtin(),
             out: Box::new(std::io::stdout()),
         }
+    }
+
+    /// Replaces the command signature registry.
+    pub fn with_registry(mut self, registry: SignatureRegistry) -> Self {
+        self.registry = registry;
+        self
     }
 
     /// Replaces the output sink. Used by tests to capture output.
@@ -61,6 +70,8 @@ impl Repl {
         self.line("  :copy [ref]           copy a block to the clipboard");
         self.line("  :share [ref] [md|json|txt] [-a]");
         self.line("  :nav next|prev|first|last|<ref>");
+        self.line("  :complete <line>      suggest completions for a line");
+        self.line("  :highlight [ref] [lang] [--annotated]");
         self.line("  :session              print the session id");
         self.line("  :help                 this message");
         self.line("  :exit                 leave");
@@ -107,6 +118,12 @@ impl Repl {
             Directive::Share { target, format, all } => self.do_share(target, format, all),
             Directive::Copy { target } => self.do_copy(target),
             Directive::Nav(nav) => self.do_nav(nav),
+            Directive::Complete { line } => self.do_complete(&line),
+            Directive::Highlight {
+                target,
+                language,
+                annotated,
+            } => self.do_highlight(target, language.as_deref(), annotated),
             Directive::Unknown(name) => {
                 self.line(&format!("error: unknown directive `:{}` (try :help)", name))
             }
@@ -288,6 +305,105 @@ impl Repl {
         }
     }
 
+    /// Completes the last token of `line` against known programs, flags, and paths.
+    fn do_complete(&mut self, line: &str) {
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let mut known = self.known_commands();
+        known.extend(extra_commands_on_path());
+
+        let results = crate::completer::complete(line, &cwd, &known, &self.registry, 20);
+        if results.is_empty() {
+            self.line(&format!("no completions for `{line}`"));
+            return;
+        }
+
+        let prefix = results.prefix();
+        for c in results.items() {
+            let detail = c.detail().map(|d| format!("  {d}")).unwrap_or_default();
+            self.line(&format!("{:<24} {:<6}{detail}", c.text(), c.kind().label()));
+        }
+
+        if let Some(best) = results.best() {
+            let completed = format!("{}{}", &line[..line.len() - prefix.len()], best.text());
+            self.line(&format!("-> {completed}"));
+        }
+    }
+
+    /// Programs available for completion: registry entries plus anything already run this session.
+    fn known_commands(&self) -> std::collections::BTreeSet<String> {
+        let mut known: std::collections::BTreeSet<String> =
+            self.registry.names().map(str::to_owned).collect();
+        for block in self.session.terminal.blocks() {
+            if let Some(program) = block.command().split_whitespace().next() {
+                known.insert(program.to_owned());
+            }
+        }
+        known
+    }
+
+    fn do_highlight(
+        &mut self,
+        target: Option<BlockRef>,
+        language: Option<&str>,
+        annotated: bool,
+    ) {
+        let index = match self.resolve_ref_or_cursor(target) {
+            Ok(i) => i,
+            Err(msg) => {
+                self.line(&format!("error: {msg}"));
+                return;
+            }
+        };
+        let block = match self.session.terminal.get_by_index(index) {
+            Ok(b) => b,
+            Err(e) => {
+                self.line(&format!("error: {e}"));
+                return;
+            }
+        };
+
+        let source = block.output().to_plain_text();
+        let lang = match language {
+            Some(l) => Some(l.to_owned()),
+            None => crate::highlight::detect_language(block.command())
+                .map(str::to_owned),
+        };
+        let Some(lang) = lang else {
+            self.line(&format!(
+                "error: cannot detect a language for `{}`; pass one, e.g. `:highlight {index} rust`",
+                block.command()
+            ));
+            return;
+        };
+
+        let mut highlighter = arborium::Highlighter::new();
+        match crate::highlight::highlight(&mut highlighter, &lang, &source) {
+            Ok(spans) => {
+                let rendered = if annotated {
+                    crate::highlight::to_annotated(&spans, &source)
+                } else {
+                    crate::highlight::to_ansi(&spans, &source)
+                };
+                let _ = self.out.write_all(rendered.as_bytes());
+                let _ = self.out.flush();
+            }
+            Err(e) => self.line(&format!("error: {e}")),
+        }
+    }
+
+    /// Resolves an optional ref, falling back to the cursor.
+    fn resolve_ref_or_cursor(&self, target: Option<BlockRef>) -> Result<BlockIndex, String> {
+        match target {
+            Some(r) => self
+                .session
+                .terminal
+                .resolve(&r)
+                .map(|b| b.index())
+                .map_err(|e| e.to_string()),
+            None => self.cursor().ok_or_else(|| "no current block".to_owned()),
+        }
+    }
+
     fn do_nav(&mut self, nav: NavDirective) {
         let len = self.session.terminal.len();
         let mut nav_guard = self.session.navigator.lock();
@@ -388,6 +504,41 @@ pub async fn run_repl(initial: Option<String>) -> std::io::Result<()> {
         repl.handle_line(&cmd).await;
     }
     repl.run().await
+}
+
+/// Scans `$PATH` for executables, so completion covers programs the registry doesn't know about.
+///
+/// Deliberately best-effort: an unreadable or missing `$PATH` yields an empty set rather than an
+/// error, because completion should never be the thing that breaks a shell.
+pub fn extra_commands_on_path() -> std::collections::BTreeSet<String> {
+    let mut found = std::collections::BTreeSet::new();
+    let Some(path) = std::env::var_os("PATH") else {
+        return found;
+    };
+
+    for dir in std::env::split_paths(&path) {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.is_empty() || name.starts_with('.') {
+                continue;
+            }
+            if is_executable(&entry.path()) {
+                found.insert(name);
+            }
+        }
+    }
+    found
+}
+
+/// Whether `path` is a regular file with any execute bit set.
+fn is_executable(path: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(path)
+        .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
 }
 
 /// Convenience for a single non-interactive run.
