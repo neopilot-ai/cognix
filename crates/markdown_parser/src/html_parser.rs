@@ -22,7 +22,7 @@ use crate::{
 // Note that we have "<b>" here because GDocs always include a top level <b> element to add additional
 // GDocs specific meta-data for its rich text content.
 const TOP_LEVEL_ELEMENT_TAGS_TO_SKIP: &[&str] = &[
-    "head", "body", "html", "meta", "table", "b", "ul", "ol", "li", "input",
+    "head", "body", "html", "meta", "table", "b", "div", "ul", "ol", "li", "input",
 ];
 const PHRASING_ELEMENT_TAGS: &[&str] = &[
     "span", "i", "code", "strong", "em", "br", "a", "s", "u", "ins",
@@ -188,6 +188,17 @@ pub fn parse_html(html: &str) -> Result<FormattedText> {
                     && get_attribute(&attrs.borrow(), "class")
                         .is_some_and(|class| class.contains("highlight"));
 
+                if is_github_code_block {
+                    let (content, language) =
+                        parse_code_block_and_language(&node.children.borrow());
+                    result.push_back(FormattedTextLine::CodeBlock(CodeBlockText {
+                        lang: language.unwrap_or(RUNNABLE_BLOCK_MARKDOWN_LANG.to_string()),
+                        code: content,
+                    }));
+                    last_active_indent_level = indent_level;
+                    continue;
+                }
+
                 // If the node is an element we are skip processing, push its children into the visit queue and skip
                 // to the next iteration.
                 if TOP_LEVEL_ELEMENT_TAGS_TO_SKIP.contains(&node_name.as_str()) {
@@ -278,7 +289,6 @@ pub fn parse_html(html: &str) -> Result<FormattedText> {
                                 Value::String(val.to_string()),
                             )]))
                         } else {
-                            // TODO: Support Github's code block representation.
                             let (content, language) =
                                 parse_code_block_and_language(&node.children.borrow());
                             FormattedTextLine::CodeBlock(CodeBlockText {
