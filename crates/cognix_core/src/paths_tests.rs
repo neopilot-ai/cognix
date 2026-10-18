@@ -14,7 +14,7 @@ fn test_data_dir_path() {
         } else if #[cfg(windows)] {
             assert_eq!(data_dir(), home_dir.join("AppData\\Roaming\\cognix\\CognixOss\\data"));
         } else {
-            unimplemented!("Need to update tests for current platform!");
+            panic!("Need to update tests for current platform!");
         }
     }
 }
@@ -31,7 +31,7 @@ fn test_config_local_dir_path() {
         } else if #[cfg(windows)] {
             assert_eq!(config_local_dir(), home_dir.join("AppData\\Local\\cognix\\CognixOss\\config"));
         } else {
-            unimplemented!("Need to update tests for current platform!");
+            panic!("Need to update tests for current platform!");
         }
     }
 }
@@ -74,7 +74,7 @@ fn test_cache_dir_path() {
         } else if #[cfg(windows)] {
             assert_eq!(cache_dir(), home_dir.join("AppData\\Local\\cognix\\CognixOss\\cache"));
         } else {
-            unimplemented!("Need to update tests for current platform!");
+            panic!("Need to update tests for current platform!");
         }
     }
 }
@@ -91,7 +91,7 @@ fn test_state_dir_path() {
         } else if #[cfg(windows)] {
             assert_eq!(state_dir(), home_dir.join("AppData\\Local\\cognix\\CognixOss\\data"));
         } else {
-            unimplemented!("Need to update tests for current platform!");
+            panic!("Need to update tests for current platform!");
         }
     }
 }
@@ -108,7 +108,7 @@ fn test_project_path_for_cognix_app_id() {
         } else if #[cfg(windows)] {
             assert_eq!(project_dirs.project_path(), "cognix\\Cognix");
         } else {
-            unimplemented!("Need to update tests for current platform!");
+            panic!("Need to update tests for current platform!");
         }
     }
 }
@@ -125,7 +125,7 @@ fn test_project_path_for_cognix_dev_app_id() {
         } else if #[cfg(windows)] {
             assert_eq!(project_dirs.project_path(), "cognix\\CognixDev");
         } else {
-            unimplemented!("Need to update tests for current platform!");
+            panic!("Need to update tests for current platform!");
         }
     }
 }
@@ -142,7 +142,7 @@ fn test_project_path_for_oss_app_id() {
         } else if #[cfg(windows)] {
             assert_eq!(project_dirs.project_path(), "cognix\\CognixOss");
         } else {
-            unimplemented!("Need to update tests for current platform!");
+            panic!("Need to update tests for current platform!");
         }
     }
 }

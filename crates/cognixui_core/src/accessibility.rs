@@ -147,7 +147,6 @@ fn string_announcement(s: String) -> String {
 }
 
 impl AccessibilityContent {
-    // TODO add frame support
     pub fn new_without_help<T>(value: T, role: CognixA11yRole) -> Self
     where
         T: Into<String>,

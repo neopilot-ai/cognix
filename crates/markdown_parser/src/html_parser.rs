@@ -22,7 +22,7 @@ use crate::{
 // Note that we have "<b>" here because GDocs always include a top level <b> element to add additional
 // GDocs specific meta-data for its rich text content.
 const TOP_LEVEL_ELEMENT_TAGS_TO_SKIP: &[&str] = &[
-    "head", "body", "html", "meta", "table", "b", "div", "ul", "ol", "li", "input",
+    "head", "body", "html", "meta", "table", "b", "ul", "ol", "li", "input",
 ];
 const PHRASING_ELEMENT_TAGS: &[&str] = &[
     "span", "i", "code", "strong", "em", "br", "a", "s", "u", "ins",
@@ -183,6 +183,10 @@ pub fn parse_html(html: &str) -> Result<FormattedText> {
                 // Instead, it marks code blocks in <span> with a specific attribute.
                 let is_confluence_code_block = node_name.as_str() == "span"
                     && includes_attribute(&attrs.borrow(), "data-ds--code--code-block");
+
+                let is_github_code_block = node_name.as_str() == "div"
+                    && get_attribute(&attrs.borrow(), "class")
+                        .is_some_and(|class| class.contains("highlight"));
 
                 // If the node is an element we are skip processing, push its children into the visit queue and skip
                 // to the next iteration.
@@ -445,8 +449,11 @@ fn parse_phrasing_content(nodes: &[Rc<Node>], text_styling: Styling) -> Formatte
                     "s" => decorated_styling.strikethrough = true,
                     "u" | "ins" => decorated_styling.underline = true,
                     "code" => decorated_styling.inline_code = true,
-                    // TODO: We need to add more phrasing styling we support (e.g. links) here.
-                    // https://linear.app/warpdotdev/issue/CLD-335/add-html-parsing-for-headers-and-lists
+                    "a" => {
+                        if let Some(href) = get_attribute(&attrs.borrow(), "href") {
+                            decorated_styling.link = Some(href.to_string());
+                        }
+                    }
                     _ => (),
                 };
 

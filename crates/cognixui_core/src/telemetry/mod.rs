@@ -111,3 +111,15 @@ pub fn record_app_active_event(
 pub fn flush_events() -> Vec<Event> {
     TELEMETRY.lock().events.drain(..).collect()
 }
+
+/// Persists current telemetry events to disk, clearing the in-memory buffer.
+/// This is called periodically and on app shutdown to prevent data loss.
+pub fn persist_events() {
+    TELEMETRY.lock().persist_to_disk();
+}
+
+/// Loads previously persisted telemetry events from disk into memory.
+/// This is called during app initialization.
+pub fn load_events() {
+    TELEMETRY.lock().load_from_disk();
+}

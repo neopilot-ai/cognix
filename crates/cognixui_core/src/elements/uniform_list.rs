@@ -176,12 +176,11 @@ where
         ctx: &mut LayoutContext,
         app: &AppContext,
     ) -> Vector2F {
-        if constraint.max.y().is_infinite() {
-            unimplemented!(
-                "UniformList does not support being rendered with an unconstrained height"
-            );
-        }
-        let mut size = constraint.max;
+        let mut size = if constraint.max.y().is_infinite() {
+            vec2f(constraint.max.x(), constraint.min.y())
+        } else {
+            constraint.max
+        };
         let mut item_constraint =
             SizeConstraint::new(vec2f(size.x(), 0.0), vec2f(size.x(), f32::INFINITY));
 
