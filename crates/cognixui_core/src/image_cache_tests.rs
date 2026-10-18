@@ -19,7 +19,7 @@ impl AssetProvider for Assets {
         match path {
             "animated.webp" => Ok(Cow::Borrowed(include_bytes!("../test_data/animated.webp"))),
             "numbers-1000ms.gif" => Ok(Cow::Borrowed(include_bytes!(
-                "../../cognixui/examples/assets/numbers-1000ms.gif"
+                "../test_data/numbers-1000ms.gif"
             ))),
             _ => <Assets as RustEmbed>::get(path)
                 .map(|f| f.data)
